@@ -406,7 +406,7 @@ export default function CalendarApp() {
                     type="text"
                     value={eventTitle}
                     onChange={(e) => setEventTitle(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100 text-gray-800 placeholder-gray-500"
                     placeholder="Enter event title"
                     onKeyPress={(e) => e.key === "Enter" && handleAddEvent()}
                   />
@@ -420,7 +420,7 @@ export default function CalendarApp() {
                     type="time"
                     value={eventTime}
                     onChange={(e) => setEventTime(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100 text-gray-800 placeholder-gray-500"
                   />
                 </div>
               </div>

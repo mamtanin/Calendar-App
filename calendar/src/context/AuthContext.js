@@ -42,6 +42,9 @@ export const AuthProvider = ({ children }) => {
       score: 0, // Initial score
       avatar: '👤', // Default avatar
       streak: 0, // Initial streak
+      punctual: 0,
+      academicWarrior: 0,
+      athleticFreak: 0,
     });
 
     return userCredential;
