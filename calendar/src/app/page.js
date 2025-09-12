@@ -20,6 +20,7 @@ import {
   orderBy,
   where,
 } from "firebase/firestore";
+import Leaderboard from "../components/Leaderboard";
 
 export default function CalendarApp() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -305,6 +306,7 @@ export default function CalendarApp() {
 
           {/* Sidebar */}
           <div className="space-y-6">
+            <Leaderboard />
             {/* Add Event Button */}
             <button
               onClick={() => setShowEventModal(true)}
