@@ -9,6 +9,17 @@ import {
   Calendar,
   Clock,
 } from "lucide-react";
+import { db } from "../lib/firebase";
+import {
+  collection,
+  addDoc,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  query,
+  orderBy,
+  where,
+} from "firebase/firestore";
 
 export default function CalendarApp() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -17,6 +28,8 @@ export default function CalendarApp() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [eventTitle, setEventTitle] = useState("");
   const [eventTime, setEventTime] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const months = [
     "January",
@@ -35,6 +48,36 @@ export default function CalendarApp() {
 
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+  // Load events from Firestore
+  useEffect(() => {
+    const eventsRef = collection(db, "events");
+    const q = query(eventsRef, orderBy("date"));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const eventsData = {};
+        snapshot.forEach((doc) => {
+          const event = { id: doc.id, ...doc.data() };
+          const dateKey = event.date;
+          if (!eventsData[dateKey]) {
+            eventsData[dateKey] = [];
+          }
+          eventsData[dateKey].push(event);
+        });
+        setEvents(eventsData);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error loading events:", error);
+        setError("Failed to load events. Please try again.");
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
   const getDaysInMonth = (date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   };
@@ -44,7 +87,9 @@ export default function CalendarApp() {
   };
 
   const formatDateKey = (year, month, day) => {
-    return `${year}-${month + 1}-${day}`;
+    return `${year}-${String(month + 1).padStart(2, "0")}-${String(
+      day
+    ).padStart(2, "0")}`;
   };
 
   const isToday = (year, month, day) => {
@@ -78,28 +123,37 @@ export default function CalendarApp() {
     });
   };
 
-  const handleAddEvent = () => {
+  const handleAddEvent = async () => {
     if (!selectedDate || !eventTitle.trim()) return;
 
-    const { dateKey } = selectedDate;
-    setEvents((prev) => ({
-      ...prev,
-      [dateKey]: [
-        ...(prev[dateKey] || []),
-        { title: eventTitle, time: eventTime },
-      ],
-    }));
+    try {
+      setError("");
+      const { dateKey } = selectedDate;
 
-    setEventTitle("");
-    setEventTime("");
-    setShowEventModal(false);
+      await addDoc(collection(db, "events"), {
+        title: eventTitle.trim(),
+        time: eventTime,
+        date: dateKey,
+        createdAt: new Date(),
+      });
+
+      setEventTitle("");
+      setEventTime("");
+      setShowEventModal(false);
+    } catch (error) {
+      console.error("Error adding event:", error);
+      setError("Failed to add event. Please try again.");
+    }
   };
 
-  const handleDeleteEvent = (dateKey, eventIndex) => {
-    setEvents((prev) => ({
-      ...prev,
-      [dateKey]: prev[dateKey].filter((_, index) => index !== eventIndex),
-    }));
+  const handleDeleteEvent = async (eventId) => {
+    try {
+      setError("");
+      await deleteDoc(doc(db, "events", eventId));
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      setError("Failed to delete event. Please try again.");
+    }
   };
 
   const renderCalendarDays = () => {
@@ -151,7 +205,7 @@ export default function CalendarApp() {
           <div className="space-y-1">
             {dayEvents.slice(0, 2).map((event, index) => (
               <div
-                key={index}
+                key={event.id}
                 className="text-xs bg-blue-500 text-white px-1 py-0.5 rounded truncate"
               >
                 {event.time && `${event.time} `}
@@ -171,9 +225,35 @@ export default function CalendarApp() {
     return days;
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Calendar className="mx-auto mb-4 text-blue-600" size={48} />
+          <div className="text-lg font-medium text-gray-900">
+            Loading calendar...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-6xl mx-auto">
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+            <button
+              onClick={() => setError("")}
+              className="float-right text-red-700 hover:text-red-900"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 p-6">
           <div className="flex items-center justify-between mb-4">
@@ -248,9 +328,9 @@ export default function CalendarApp() {
                 </h3>
                 <div className="space-y-2">
                   {events[selectedDate.dateKey]?.length > 0 ? (
-                    events[selectedDate.dateKey].map((event, index) => (
+                    events[selectedDate.dateKey].map((event) => (
                       <div
-                        key={index}
+                        key={event.id}
                         className="flex items-start justify-between bg-gray-50 p-3 rounded-lg"
                       >
                         <div>
@@ -265,9 +345,7 @@ export default function CalendarApp() {
                           )}
                         </div>
                         <button
-                          onClick={() =>
-                            handleDeleteEvent(selectedDate.dateKey, index)
-                          }
+                          onClick={() => handleDeleteEvent(event.id)}
                           className="text-red-500 hover:text-red-700 p-1"
                         >
                           <X size={16} />
@@ -318,6 +396,7 @@ export default function CalendarApp() {
                     onChange={(e) => setEventTitle(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter event title"
+                    onKeyPress={(e) => e.key === "Enter" && handleAddEvent()}
                   />
                 </div>
 
@@ -343,7 +422,8 @@ export default function CalendarApp() {
                 </button>
                 <button
                   onClick={handleAddEvent}
-                  className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  disabled={!eventTitle.trim()}
+                  className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
                   Add Event
                 </button>
