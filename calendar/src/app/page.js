@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "../context/AuthContext";
 import {
   ChevronLeft,
   ChevronRight,
@@ -8,6 +10,7 @@ import {
   X,
   Calendar,
   Clock,
+  LogOut,
 } from "lucide-react";
 import { db } from "../lib/firebase";
 import {
@@ -23,6 +26,9 @@ import {
 import Leaderboard from "../components/Leaderboard";
 
 export default function CalendarApp() {
+  const { user, loading: authLoading, signOut } = useAuth();
+  const router = useRouter();
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [events, setEvents] = useState({});
@@ -31,6 +37,12 @@ export default function CalendarApp() {
   const [eventTime, setEventTime] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, authLoading, router]);
 
   const months = [
     "January",
@@ -51,8 +63,10 @@ export default function CalendarApp() {
 
   // Load events from Firestore
   useEffect(() => {
+    if (!user) return;
+
     const eventsRef = collection(db, "events");
-    const q = query(eventsRef, orderBy("date"));
+    const q = query(eventsRef, where("userId", "==", user.uid), orderBy("date"));
 
     const unsubscribe = onSnapshot(
       q,
@@ -77,7 +91,7 @@ export default function CalendarApp() {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   const getDaysInMonth = (date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -125,7 +139,7 @@ export default function CalendarApp() {
   };
 
   const handleAddEvent = async () => {
-    if (!selectedDate || !eventTitle.trim()) return;
+    if (!selectedDate || !eventTitle.trim() || !user) return;
 
     try {
       setError("");
@@ -136,6 +150,7 @@ export default function CalendarApp() {
         time: eventTime,
         date: dateKey,
         createdAt: new Date(),
+        userId: user.uid,
       });
 
       setEventTitle("");
@@ -162,14 +177,12 @@ export default function CalendarApp() {
     const firstDay = getFirstDayOfMonth(currentDate);
     const days = [];
 
-    // Empty cells for days before the first day of the month
     for (let i = 0; i < firstDay; i++) {
       days.push(
         <div key={`empty-${i}`} className="h-24 border border-gray-200"></div>
       );
     }
 
-    // Days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const dateKey = formatDateKey(
         currentDate.getFullYear(),
@@ -204,7 +217,7 @@ export default function CalendarApp() {
             {day}
           </div>
           <div className="space-y-1">
-            {dayEvents.slice(0, 2).map((event, index) => (
+            {dayEvents.slice(0, 2).map((event) => (
               <div
                 key={event.id}
                 className="text-xs bg-blue-500 text-white px-1 py-0.5 rounded truncate"
@@ -226,11 +239,11 @@ export default function CalendarApp() {
     return days;
   };
 
-  if (loading) {
+  if (authLoading || loading || !user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Calendar className="mx-auto mb-4 text-blue-600" size={48} />
+          <Calendar className="mx-auto mb-4 text-blue-600 animate-spin" size={48} />
           <div className="text-lg font-medium text-gray-900">
             Loading calendar...
           </div>
@@ -242,7 +255,6 @@ export default function CalendarApp() {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-6xl mx-auto">
-        {/* Error Message */}
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             {error}
@@ -255,7 +267,6 @@ export default function CalendarApp() {
           </div>
         )}
 
-        {/* Header */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 p-6">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
@@ -278,10 +289,15 @@ export default function CalendarApp() {
               >
                 <ChevronRight size={20} />
               </button>
+              <button
+                onClick={signOut}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-red-500"
+              >
+                <LogOut size={20} />
+              </button>
             </div>
           </div>
 
-          {/* Days of week header */}
           <div className="grid grid-cols-7 gap-0 mb-4">
             {daysOfWeek.map((day) => (
               <div
@@ -295,7 +311,6 @@ export default function CalendarApp() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Calendar Grid */}
           <div className="lg:col-span-3">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
               <div className="grid grid-cols-7 gap-0">
@@ -304,10 +319,8 @@ export default function CalendarApp() {
             </div>
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
             <Leaderboard />
-            {/* Add Event Button */}
             <button
               onClick={() => setShowEventModal(true)}
               disabled={!selectedDate}
@@ -321,12 +334,10 @@ export default function CalendarApp() {
               Add Event
             </button>
 
-            {/* Selected Date Events */}
             {selectedDate && (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <h3 className="font-semibold text-gray-900 mb-3">
-                  {months[selectedDate.month]} {selectedDate.day},{" "}
-                  {selectedDate.year}
+                  {months[selectedDate.month]} {selectedDate.day}, {selectedDate.year}
                 </h3>
                 <div className="space-y-2">
                   {events[selectedDate.dateKey]?.length > 0 ? (
@@ -373,7 +384,6 @@ export default function CalendarApp() {
           </div>
         </div>
 
-        {/* Event Modal */}
         {showEventModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
