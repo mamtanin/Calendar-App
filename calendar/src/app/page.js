@@ -1,101 +1,357 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">AHHHHHHHHH</li>
-        </ol>
+import { useState, useEffect } from "react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  X,
+  Calendar,
+  Clock,
+} from "lucide-react";
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+export default function CalendarApp() {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [events, setEvents] = useState({});
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [eventTitle, setEventTitle] = useState("");
+  const [eventTime, setEventTime] = useState("");
+
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const getDaysInMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  };
+
+  const formatDateKey = (year, month, day) => {
+    return `${year}-${month + 1}-${day}`;
+  };
+
+  const isToday = (year, month, day) => {
+    const today = new Date();
+    return (
+      year === today.getFullYear() &&
+      month === today.getMonth() &&
+      day === today.getDate()
+    );
+  };
+
+  const navigateMonth = (direction) => {
+    setCurrentDate((prev) => {
+      const newDate = new Date(prev);
+      newDate.setMonth(prev.getMonth() + direction);
+      return newDate;
+    });
+  };
+
+  const handleDateClick = (day) => {
+    const dateKey = formatDateKey(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      day
+    );
+    setSelectedDate({
+      year: currentDate.getFullYear(),
+      month: currentDate.getMonth(),
+      day,
+      dateKey,
+    });
+  };
+
+  const handleAddEvent = () => {
+    if (!selectedDate || !eventTitle.trim()) return;
+
+    const { dateKey } = selectedDate;
+    setEvents((prev) => ({
+      ...prev,
+      [dateKey]: [
+        ...(prev[dateKey] || []),
+        { title: eventTitle, time: eventTime },
+      ],
+    }));
+
+    setEventTitle("");
+    setEventTime("");
+    setShowEventModal(false);
+  };
+
+  const handleDeleteEvent = (dateKey, eventIndex) => {
+    setEvents((prev) => ({
+      ...prev,
+      [dateKey]: prev[dateKey].filter((_, index) => index !== eventIndex),
+    }));
+  };
+
+  const renderCalendarDays = () => {
+    const daysInMonth = getDaysInMonth(currentDate);
+    const firstDay = getFirstDayOfMonth(currentDate);
+    const days = [];
+
+    // Empty cells for days before the first day of the month
+    for (let i = 0; i < firstDay; i++) {
+      days.push(
+        <div key={`empty-${i}`} className="h-24 border border-gray-200"></div>
+      );
+    }
+
+    // Days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateKey = formatDateKey(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        day
+      );
+      const dayEvents = events[dateKey] || [];
+      const isSelectedDate =
+        selectedDate &&
+        selectedDate.day === day &&
+        selectedDate.month === currentDate.getMonth() &&
+        selectedDate.year === currentDate.getFullYear();
+      const isTodayDate = isToday(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        day
+      );
+
+      days.push(
+        <div
+          key={day}
+          className={`h-24 border border-gray-200 p-1 cursor-pointer hover:bg-gray-50 transition-colors ${
+            isSelectedDate ? "bg-blue-100 border-blue-300" : ""
+          } ${isTodayDate ? "bg-yellow-50 border-yellow-300" : ""}`}
+          onClick={() => handleDateClick(day)}
+        >
+          <div
+            className={`text-sm font-medium mb-1 ${
+              isTodayDate ? "text-yellow-800" : "text-gray-700"
+            }`}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            {day}
+          </div>
+          <div className="space-y-1">
+            {dayEvents.slice(0, 2).map((event, index) => (
+              <div
+                key={index}
+                className="text-xs bg-blue-500 text-white px-1 py-0.5 rounded truncate"
+              >
+                {event.time && `${event.time} `}
+                {event.title}
+              </div>
+            ))}
+            {dayEvents.length > 2 && (
+              <div className="text-xs text-gray-500">
+                +{dayEvents.length - 2} more
+              </div>
+            )}
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      );
+    }
+
+    return days;
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+              <Calendar className="text-blue-600" size={32} />
+              My Calendar
+            </h1>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigateMonth(-1)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <h2 className="text-xl font-semibold text-gray-800 min-w-[200px] text-center">
+                {months[currentDate.getMonth()]} {currentDate.getFullYear()}
+              </h2>
+              <button
+                onClick={() => navigateMonth(1)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Days of week header */}
+          <div className="grid grid-cols-7 gap-0 mb-4">
+            {daysOfWeek.map((day) => (
+              <div
+                key={day}
+                className="p-3 text-center font-medium text-gray-600 bg-gray-100 border border-gray-200"
+              >
+                {day}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Calendar Grid */}
+          <div className="lg:col-span-3">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="grid grid-cols-7 gap-0">
+                {renderCalendarDays()}
+              </div>
+            </div>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Add Event Button */}
+            <button
+              onClick={() => setShowEventModal(true)}
+              disabled={!selectedDate}
+              className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-colors ${
+                selectedDate
+                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
+            >
+              <Plus size={20} />
+              Add Event
+            </button>
+
+            {/* Selected Date Events */}
+            {selectedDate && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <h3 className="font-semibold text-gray-900 mb-3">
+                  {months[selectedDate.month]} {selectedDate.day},{" "}
+                  {selectedDate.year}
+                </h3>
+                <div className="space-y-2">
+                  {events[selectedDate.dateKey]?.length > 0 ? (
+                    events[selectedDate.dateKey].map((event, index) => (
+                      <div
+                        key={index}
+                        className="flex items-start justify-between bg-gray-50 p-3 rounded-lg"
+                      >
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {event.title}
+                          </div>
+                          {event.time && (
+                            <div className="text-sm text-gray-600 flex items-center gap-1 mt-1">
+                              <Clock size={14} />
+                              {event.time}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() =>
+                            handleDeleteEvent(selectedDate.dateKey, index)
+                          }
+                          className="text-red-500 hover:text-red-700 p-1"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-gray-500 text-sm">
+                      No events for this date
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!selectedDate && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <p className="text-gray-500 text-sm">
+                  Select a date to view or add events
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Event Modal */}
+        {showEventModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Add Event</h3>
+                <button
+                  onClick={() => setShowEventModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Event Title
+                  </label>
+                  <input
+                    type="text"
+                    value={eventTitle}
+                    onChange={(e) => setEventTitle(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter event title"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Time (optional)
+                  </label>
+                  <input
+                    type="time"
+                    value={eventTime}
+                    onChange={(e) => setEventTime(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowEventModal(false)}
+                  className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddEvent}
+                  className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Add Event
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
