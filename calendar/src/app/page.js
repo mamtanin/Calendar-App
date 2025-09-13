@@ -32,6 +32,7 @@ import {
 import Leaderboard from "../components/Leaderboard";
 import CompleteEventModal from "../components/CompleteEventModal";
 import Achievements from "../components/Achievements";
+import Profile from "../components/profile";
 
 export default function CalendarApp() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -229,7 +230,7 @@ export default function CalendarApp() {
         title: eventTitle.trim(),
         time: eventTime,
         notes: eventNotes,
-        date: dateKey, // This should now correctly use the selected date
+        date: dateKey,
         recurrence: recurrence,
         createdAt: new Date(),
         userId: user.uid,
@@ -451,7 +452,7 @@ export default function CalendarApp() {
             Loading your magical calendar...
           </div>
           <div className="text-sm text-green-200 mt-2">
-            ✨ Preparing something beautiful
+            Preparing something beautiful
           </div>
         </div>
       </div>
@@ -499,7 +500,7 @@ export default function CalendarApp() {
                     My Calendar
                   </h1>
                   <p className="text-gray-600 font-medium">
-                    Welcome back, {user?.email?.split("@")[0]} ✨
+                    Welcome back, {user?.email?.split("@")[0]}
                   </p>
                 </div>
               </div>
@@ -587,12 +588,18 @@ export default function CalendarApp() {
           </div>
         </div>
 
+        {/* Main Content */}
         {searchQuery ? (
-          <div>{renderSearchResults()}</div>
+          renderSearchResults()
         ) : (
-          <div className="grid grid-cols-12 gap-6">
-            {/* Calendar Grid - Now takes up more space */}
-            <div className="col-span-12 lg:col-span-8">
+          <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
+            {/* Profile Component */}
+            <div className="xl:col-span-1">
+              <Profile profile={profile} />
+            </div>
+
+            {/* Calendar Grid */}
+            <div className="xl:col-span-3">
               <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 overflow-hidden">
                 <div className="grid grid-cols-7 gap-2 p-6">
                   {renderCalendarDays()}
@@ -600,8 +607,8 @@ export default function CalendarApp() {
               </div>
             </div>
 
-            {/* Sidebar - Now more compact */}
-            <div className="col-span-12 lg:col-span-4 space-y-6">
+            {/* Sidebar */}
+            <div className="xl:col-span-1 space-y-6">
               {/* Add Event Button */}
               <button
                 onClick={() => setShowEventModal(true)}
@@ -715,10 +722,8 @@ export default function CalendarApp() {
                 <Achievements profile={profile} />
               </div>
 
-              {/* Leaderboard - Made more compact */}
-              <div className="transform hover:scale-105 transition-all duration-300">
-                <Leaderboard />
-              </div>
+              {/* Leaderboard */}
+              <Leaderboard />
             </div>
           </div>
         )}
@@ -729,8 +734,7 @@ export default function CalendarApp() {
             <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 transform scale-100 transition-all duration-300">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-2xl font-bold bg-gradient-to-r from-green-800 to-green-700 bg-clip-text text-transparent">
-                  ✨ Add Event for {months[selectedDate.month]}{" "}
-                  {selectedDate.day}
+                  Add Event for {months[selectedDate.month]} {selectedDate.day}
                 </h3>
                 <button
                   onClick={() => setShowEventModal(false)}
@@ -750,7 +754,7 @@ export default function CalendarApp() {
                     value={eventTitle}
                     onChange={(e) => setEventTitle(e.target.value)}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-700 focus:border-green-700 transition-all duration-200 text-gray-800 placeholder-gray-400"
-                    placeholder="What's on your agenda? 🎯"
+                    placeholder="What's on your agenda?"
                     onKeyPress={(e) => e.key === "Enter" && handleAddEvent()}
                   />
                 </div>
@@ -809,7 +813,7 @@ export default function CalendarApp() {
                   disabled={!eventTitle.trim()}
                   className="flex-1 py-3 px-6 bg-gradient-to-r from-green-800 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-600 transition-all duration-200 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed font-medium shadow-lg"
                 >
-                  Add Event ✨
+                  Add Event
                 </button>
               </div>
             </div>
