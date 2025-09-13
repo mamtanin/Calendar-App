@@ -22,8 +22,11 @@ import {
   query,
   orderBy,
   where,
+  updateDoc,
+  increment,
 } from "firebase/firestore";
 import Leaderboard from "../components/Leaderboard";
+import CompleteEventModal from "../components/CompleteEventModal";
 
 export default function CalendarApp() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -37,6 +40,8 @@ export default function CalendarApp() {
   const [eventTime, setEventTime] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [eventToComplete, setEventToComplete] = useState(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -151,6 +156,7 @@ export default function CalendarApp() {
         date: dateKey,
         createdAt: new Date(),
         userId: user.uid,
+        completed: false,
       });
 
       setEventTitle("");
@@ -169,6 +175,30 @@ export default function CalendarApp() {
     } catch (error) {
       console.error("Error deleting event:", error);
       setError("Failed to delete event. Please try again.");
+    }
+  };
+
+  const handleCompleteEvent = async (category) => {
+    if (!eventToComplete || !user) return;
+
+    try {
+      setError("");
+      const eventRef = doc(db, "events", eventToComplete.id);
+      await updateDoc(eventRef, {
+        completed: true,
+      });
+
+      const profileRef = doc(db, "profiles", user.uid);
+      await updateDoc(profileRef, {
+        [category]: increment(1),
+        score: increment(1),
+      });
+
+      setShowCompleteModal(false);
+      setEventToComplete(null);
+    } catch (error) {
+      console.error("Error completing event:", error);
+      setError("Failed to complete event. Please try again.");
     }
   };
 
@@ -344,18 +374,40 @@ export default function CalendarApp() {
                     events[selectedDate.dateKey].map((event) => (
                       <div
                         key={event.id}
-                        className="flex items-start justify-between bg-gray-50 p-3 rounded-lg"
+                        className={`flex items-start justify-between p-3 rounded-lg ${
+                          event.completed ? "bg-gray-200" : "bg-gray-50"
+                        }`}
                       >
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            {event.title}
-                          </div>
-                          {event.time && (
-                            <div className="text-sm text-gray-600 flex items-center gap-1 mt-1">
-                              <Clock size={14} />
-                              {event.time}
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={event.completed || false}
+                            onChange={() => {
+                              if (!event.completed) {
+                                setEventToComplete(event);
+                                setShowCompleteModal(true);
+                              }
+                            }}
+                            className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500 border-gray-300"
+                            disabled={event.completed}
+                          />
+                          <div>
+                            <div
+                              className={`font-medium ${
+                                event.completed
+                                  ? "text-gray-500 line-through"
+                                  : "text-gray-900"
+                              }`}
+                            >
+                              {event.title}
                             </div>
-                          )}
+                            {event.time && (
+                              <div className="text-sm text-gray-600 flex items-center gap-1 mt-1">
+                                <Clock size={14} />
+                                {event.time}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <button
                           onClick={() => handleDeleteEvent(event.id)}
@@ -443,6 +495,15 @@ export default function CalendarApp() {
             </div>
           </div>
         )}
+
+        <CompleteEventModal
+          isOpen={showCompleteModal}
+          onClose={() => {
+            setShowCompleteModal(false);
+            setEventToComplete(null);
+          }}
+          onComplete={handleCompleteEvent}
+        />
       </div>
     </div>
   );
