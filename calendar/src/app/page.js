@@ -11,6 +11,9 @@ import {
   Calendar,
   Clock,
   LogOut,
+  Sparkles,
+  CheckCircle2,
+  Star,
 } from "lucide-react";
 import { db } from "../lib/firebase";
 import {
@@ -71,7 +74,11 @@ export default function CalendarApp() {
     if (!user) return;
 
     const eventsRef = collection(db, "events");
-    const q = query(eventsRef, where("userId", "==", user.uid), orderBy("date"));
+    const q = query(
+      eventsRef,
+      where("userId", "==", user.uid),
+      orderBy("date")
+    );
 
     const unsubscribe = onSnapshot(
       q,
@@ -209,7 +216,10 @@ export default function CalendarApp() {
 
     for (let i = 0; i < firstDay; i++) {
       days.push(
-        <div key={`empty-${i}`} className="h-24 border border-gray-200"></div>
+        <div
+          key={`empty-${i}`}
+          className="h-28 border border-gray-100 bg-gray-50/30"
+        ></div>
       );
     }
 
@@ -220,6 +230,8 @@ export default function CalendarApp() {
         day
       );
       const dayEvents = events[dateKey] || [];
+      const completedCount = dayEvents.filter((e) => e.completed).length;
+      const totalCount = dayEvents.length;
       const isSelectedDate =
         selectedDate &&
         selectedDate.day === day &&
@@ -234,30 +246,68 @@ export default function CalendarApp() {
       days.push(
         <div
           key={day}
-          className={`h-24 border border-gray-200 p-1 cursor-pointer hover:bg-gray-50 transition-colors ${
-            isSelectedDate ? "bg-blue-100 border-blue-300" : ""
-          } ${isTodayDate ? "bg-yellow-50 border-yellow-300" : ""}`}
+          className={`h-28 border border-gray-100 p-2 cursor-pointer transition-all duration-300 ease-out transform hover:scale-105 hover:shadow-lg relative group ${
+            isSelectedDate
+              ? "bg-gradient-to-br from-green-50 to-green-100 border-green-300 shadow-lg ring-2 ring-green-200"
+              : "hover:bg-gradient-to-br hover:from-gray-50 hover:to-green-50"
+          } ${
+            isTodayDate
+              ? "bg-gradient-to-br from-green-100 to-green-200 border-green-400 shadow-md ring-2 ring-green-300"
+              : "bg-white"
+          }`}
           onClick={() => handleDateClick(day)}
         >
+          {/* Sparkle effect for today */}
+          {isTodayDate && (
+            <Sparkles
+              className="absolute top-1 right-1 text-green-600 animate-pulse"
+              size={12}
+            />
+          )}
+
           <div
-            className={`text-sm font-medium mb-1 ${
-              isTodayDate ? "text-yellow-800" : "text-gray-700"
+            className={`text-sm font-bold mb-2 flex items-center justify-between ${
+              isTodayDate
+                ? "text-green-800"
+                : isSelectedDate
+                ? "text-green-800"
+                : "text-gray-700"
             }`}
           >
-            {day}
+            <span>{day}</span>
+            {totalCount > 0 && (
+              <div className="flex items-center gap-1">
+                {completedCount === totalCount && totalCount > 0 && (
+                  <Star className="text-green-500" size={12} />
+                )}
+                <span className="text-xs bg-gray-200 px-1.5 py-0.5 rounded-full">
+                  {completedCount}/{totalCount}
+                </span>
+              </div>
+            )}
           </div>
-          <div className="space-y-1">
+
+          <div className="space-y-1 overflow-hidden">
             {dayEvents.slice(0, 2).map((event) => (
               <div
                 key={event.id}
-                className="text-xs bg-blue-500 text-white px-1 py-0.5 rounded truncate"
+                className={`text-xs px-2 py-1 rounded-full truncate transition-all duration-200 ${
+                  event.completed
+                    ? "bg-green-100 text-green-800 border border-green-200"
+                    : "bg-gradient-to-r from-green-800 to-green-700 text-white shadow-sm"
+                }`}
               >
-                {event.time && `${event.time} `}
-                {event.title}
+                <div className="flex items-center gap-1">
+                  {event.completed && <CheckCircle2 size={10} />}
+                  <span>
+                    {event.time && `${event.time} `}
+                    {event.title}
+                  </span>
+                </div>
               </div>
             ))}
             {dayEvents.length > 2 && (
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-gray-500 font-medium bg-gray-100 px-2 py-1 rounded-full text-center">
                 +{dayEvents.length - 2} more
               </div>
             )}
@@ -271,11 +321,23 @@ export default function CalendarApp() {
 
   if (authLoading || loading || !user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Calendar className="mx-auto mb-4 text-blue-600 animate-spin" size={48} />
-          <div className="text-lg font-medium text-gray-900">
-            Loading calendar...
+      <div className="min-h-screen bg-green-800 flex items-center justify-center">
+        <div className="text-center text-white">
+          <div className="relative">
+            <Calendar
+              className="mx-auto mb-6 text-white animate-spin"
+              size={64}
+            />
+            <Sparkles
+              className="absolute top-0 right-0 text-white animate-pulse"
+              size={24}
+            />
+          </div>
+          <div className="text-xl font-medium">
+            Loading your magical calendar...
+          </div>
+          <div className="text-sm text-green-200 mt-2">
+            ✨ Preparing something beautiful
           </div>
         </div>
       </div>
@@ -283,99 +345,153 @@ export default function CalendarApp() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-6xl mx-auto">
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
-            <button
-              onClick={() => setError("")}
-              className="float-right text-red-700 hover:text-red-900"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        )}
+    <div className="min-h-screen bg-gray-100">
+      {/* Animated background elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-r from-green-300 to-green-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-r from-green-200 to-green-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-1000"></div>
+      </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <Calendar className="text-blue-600" size={32} />
-              My Calendar
-            </h1>
-            <div className="flex items-center gap-4">
+      <div className="relative z-10 max-w-7xl mx-auto p-6">
+        {error && (
+          <div className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-4 rounded-2xl mb-6 shadow-lg">
+            <div className="flex items-center justify-between">
+              <span className="font-medium">{error}</span>
               <button
-                onClick={() => navigateMonth(-1)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                onClick={() => setError("")}
+                className="text-white hover:text-red-100 transition-colors"
               >
-                <ChevronLeft size={20} />
-              </button>
-              <h2 className="text-xl font-semibold text-gray-800 min-w-[200px] text-center">
-                {months[currentDate.getMonth()]} {currentDate.getFullYear()}
-              </h2>
-              <button
-                onClick={() => navigateMonth(1)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ChevronRight size={20} />
-              </button>
-              <button
-                onClick={signOut}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-red-500"
-              >
-                <LogOut size={20} />
+                <X size={20} />
               </button>
             </div>
           </div>
+        )}
 
-          <div className="grid grid-cols-7 gap-0 mb-4">
-            {daysOfWeek.map((day) => (
-              <div
-                key={day}
-                className="p-3 text-center font-medium text-gray-600 bg-gray-100 border border-gray-200"
-              >
-                {day}
+        {/* Header */}
+        <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 mb-8 p-8 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-green-800/5 to-green-800/5"></div>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Calendar className="text-green-800" size={40} />
+                  <Sparkles
+                    className="absolute -top-1 -right-1 text-green-600 animate-pulse"
+                    size={16}
+                  />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold bg-gradient-to-r from-green-800 to-green-700 bg-clip-text text-transparent">
+                    My Calendar
+                  </h1>
+                  <p className="text-gray-600 font-medium">
+                    Welcome back, {user?.email?.split("@")[0]} ✨
+                  </p>
+                </div>
               </div>
-            ))}
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => navigateMonth(-1)}
+                  className="p-3 hover:bg-green-100 rounded-2xl transition-all duration-200 transform hover:scale-110 hover:shadow-md group"
+                >
+                  <ChevronLeft
+                    size={24}
+                    className="text-green-800 group-hover:text-green-700"
+                  />
+                </button>
+
+                <div className="bg-gradient-to-r from-green-800 to-green-700 text-white px-6 py-3 rounded-2xl shadow-lg">
+                  <h2 className="text-xl font-bold text-center min-w-[220px]">
+                    {months[currentDate.getMonth()]} {currentDate.getFullYear()}
+                  </h2>
+                </div>
+
+                <button
+                  onClick={() => navigateMonth(1)}
+                  className="p-3 hover:bg-green-100 rounded-2xl transition-all duration-200 transform hover:scale-110 hover:shadow-md group"
+                >
+                  <ChevronRight
+                    size={24}
+                    className="text-green-800 group-hover:text-green-700"
+                  />
+                </button>
+
+                <button
+                  onClick={signOut}
+                  className="p-3 hover:bg-red-100 rounded-2xl transition-all duration-200 transform hover:scale-110 hover:shadow-md group ml-4"
+                >
+                  <LogOut
+                    size={24}
+                    className="text-red-500 group-hover:text-red-600"
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Days of week header */}
+            <div className="grid grid-cols-7 gap-2 mb-6">
+              {daysOfWeek.map((day) => (
+                <div
+                  key={day}
+                  className="p-4 text-center font-bold text-gray-700 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200"
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              <div className="grid grid-cols-7 gap-0">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+          {/* Calendar Grid */}
+          <div className="xl:col-span-3">
+            <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 overflow-hidden">
+              <div className="grid grid-cols-7 gap-2 p-6">
                 {renderCalendarDays()}
               </div>
             </div>
           </div>
 
+          {/* Sidebar */}
           <div className="space-y-6">
-            <Leaderboard />
+            {/* Leaderboard */}
+            <div className="transform hover:scale-105 transition-all duration-300">
+              <Leaderboard />
+            </div>
+
+            {/* Add Event Button */}
             <button
               onClick={() => setShowEventModal(true)}
               disabled={!selectedDate}
-              className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-colors ${
+              className={`w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-bold text-lg transition-all duration-300 transform hover:scale-105 ${
                 selectedDate
-                  ? "bg-blue-600 text-white hover:bg-blue-700"
-                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  ? "bg-gradient-to-r from-green-800 to-green-700 text-white hover:from-green-700 hover:to-green-600 shadow-lg hover:shadow-xl"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
               }`}
             >
-              <Plus size={20} />
+              <Plus size={24} />
               Add Event
+              {selectedDate && <Sparkles size={20} className="animate-pulse" />}
             </button>
 
+            {/* Selected Date Events */}
             {selectedDate && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">
-                  {months[selectedDate.month]} {selectedDate.day}, {selectedDate.year}
+              <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-6 transform hover:scale-105 transition-all duration-300">
+                <h3 className="font-bold text-xl text-gray-800 mb-4 flex items-center gap-2">
+                  <Star className="text-green-600" size={20} />
+                  {months[selectedDate.month]} {selectedDate.day},{" "}
+                  {selectedDate.year}
                 </h3>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {events[selectedDate.dateKey]?.length > 0 ? (
                     events[selectedDate.dateKey].map((event) => (
                       <div
                         key={event.id}
-                        className={`flex items-start justify-between p-3 rounded-lg ${
-                          event.completed ? "bg-gray-200" : "bg-gray-50"
+                        className={`flex items-start justify-between p-4 rounded-2xl transition-all duration-200 hover:shadow-md ${
+                          event.completed
+                            ? "bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200"
+                            : "bg-gradient-to-r from-green-50 to-green-100 border-2 border-green-200"
                         }`}
                       >
                         <div className="flex items-center gap-3">
@@ -388,22 +504,22 @@ export default function CalendarApp() {
                                 setShowCompleteModal(true);
                               }
                             }}
-                            className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500 border-gray-300"
+                            className="h-6 w-6 rounded-lg text-green-800 focus:ring-green-700 border-2 border-gray-300 transition-all duration-200"
                             disabled={event.completed}
                           />
                           <div>
                             <div
-                              className={`font-medium ${
+                              className={`font-bold text-lg ${
                                 event.completed
-                                  ? "text-gray-500 line-through"
-                                  : "text-gray-900"
+                                  ? "text-green-700 line-through"
+                                  : "text-gray-800"
                               }`}
                             >
                               {event.title}
                             </div>
                             {event.time && (
-                              <div className="text-sm text-gray-600 flex items-center gap-1 mt-1">
-                                <Clock size={14} />
+                              <div className="text-sm text-gray-600 flex items-center gap-2 mt-1">
+                                <Clock size={16} />
                                 {event.time}
                               </div>
                             )}
@@ -411,85 +527,101 @@ export default function CalendarApp() {
                         </div>
                         <button
                           onClick={() => handleDeleteEvent(event.id)}
-                          className="text-red-500 hover:text-red-700 p-1"
+                          className="text-red-500 hover:text-red-700 p-2 hover:bg-red-100 rounded-xl transition-all duration-200"
                         >
-                          <X size={16} />
+                          <X size={20} />
                         </button>
                       </div>
                     ))
                   ) : (
-                    <p className="text-gray-500 text-sm">
-                      No events for this date
-                    </p>
+                    <div className="text-center py-8">
+                      <Calendar
+                        className="mx-auto mb-3 text-gray-300"
+                        size={48}
+                      />
+                      <p className="text-gray-500 font-medium">
+                        No events for this date
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        Click "Add Event" to get started!
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
             )}
 
             {!selectedDate && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <p className="text-gray-500 text-sm">
-                  Select a date to view or add events
+              <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-6 text-center">
+                <Calendar className="mx-auto mb-4 text-gray-300" size={48} />
+                <p className="text-gray-500 font-medium text-lg">
+                  Select a date
+                </p>
+                <p className="text-sm text-gray-400 mt-1">
+                  Choose any day to view or add events
                 </p>
               </div>
             )}
           </div>
         </div>
 
+        {/* Event Modal */}
         {showEventModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Add Event</h3>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 transform scale-100 transition-all duration-300">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-green-800 to-green-700 bg-clip-text text-transparent">
+                  ✨ Add New Event
+                </h3>
                 <button
                   onClick={() => setShowEventModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-xl transition-all duration-200"
                 >
-                  <X size={20} />
+                  <X size={24} />
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-bold text-gray-700 mb-3">
                     Event Title
                   </label>
                   <input
                     type="text"
                     value={eventTitle}
                     onChange={(e) => setEventTitle(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100 text-gray-800 placeholder-gray-500"
-                    placeholder="Enter event title"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-700 focus:border-green-700 transition-all duration-200 text-gray-800 placeholder-gray-400"
+                    placeholder="What's on your agenda? 🎯"
                     onKeyPress={(e) => e.key === "Enter" && handleAddEvent()}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-bold text-gray-700 mb-3">
                     Time (optional)
                   </label>
                   <input
                     type="time"
                     value={eventTime}
                     onChange={(e) => setEventTime(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100 text-gray-800 placeholder-gray-500"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-700 focus:border-green-700 transition-all duration-200 text-gray-800"
                   />
                 </div>
               </div>
 
-              <div className="flex gap-3 mt-6">
+              <div className="flex gap-4 mt-8">
                 <button
                   onClick={() => setShowEventModal(false)}
-                  className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 py-3 px-6 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddEvent}
                   disabled={!eventTitle.trim()}
-                  className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  className="flex-1 py-3 px-6 bg-gradient-to-r from-green-800 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-600 transition-all duration-200 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed font-medium shadow-lg"
                 >
-                  Add Event
+                  Add Event ✨
                 </button>
               </div>
             </div>
