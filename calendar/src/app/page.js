@@ -14,6 +14,7 @@ import {
   Sparkles,
   CheckCircle2,
   Star,
+  Search,
 } from "lucide-react";
 import { db } from "../lib/firebase";
 import {
@@ -30,6 +31,7 @@ import {
 } from "firebase/firestore";
 import Leaderboard from "../components/Leaderboard";
 import CompleteEventModal from "../components/CompleteEventModal";
+import Achievements from "../components/Achievements";
 
 export default function CalendarApp() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -41,16 +43,31 @@ export default function CalendarApp() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [eventTitle, setEventTitle] = useState("");
   const [eventTime, setEventTime] = useState("");
+  const [eventNotes, setEventNotes] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [eventToComplete, setEventToComplete] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [recurrence, setRecurrence] = useState("none");
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/login");
     }
   }, [user, authLoading, router]);
+
+  useEffect(() => {
+    if (!user) return;
+    const profileRef = doc(db, "profiles", user.uid);
+    const unsubscribe = onSnapshot(profileRef, (doc) => {
+      if (doc.exists()) {
+        setProfile(doc.data());
+      }
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   const months = [
     "January",
@@ -69,6 +86,65 @@ export default function CalendarApp() {
 
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+  const expandRecurringEvents = (docs) => {
+    const eventsData = {};
+    const startDate = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      1
+    );
+    const endDate = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + 1,
+      0
+    );
+
+    docs.forEach((doc) => {
+      const event = { id: doc.id, ...doc.data() };
+      const eventDate = new Date(event.date + "T00:00:00");
+
+      // Function to add event to eventsData
+      const addEventToDate = (date) => {
+        const dateKey = formatDateKey(
+          date.getFullYear(),
+          date.getMonth(),
+          date.getDate()
+        );
+        if (!eventsData[dateKey]) {
+          eventsData[dateKey] = [];
+        }
+        // Avoid adding duplicates
+        if (!eventsData[dateKey].some((e) => e.id === event.id)) {
+          eventsData[dateKey].push({ ...event, date: dateKey });
+        }
+      };
+
+      if (event.recurrence === "none") {
+        if (eventDate >= startDate && eventDate <= endDate) {
+          addEventToDate(eventDate);
+        }
+      } else {
+        let recurringDate = new Date(event.date + "T00:00:00");
+        while (recurringDate <= endDate) {
+          if (recurringDate >= startDate) {
+            addEventToDate(new Date(recurringDate));
+          }
+
+          if (event.recurrence === "daily") {
+            recurringDate.setDate(recurringDate.getDate() + 1);
+          } else if (event.recurrence === "weekly") {
+            recurringDate.setDate(recurringDate.getDate() + 7);
+          } else if (event.recurrence === "monthly") {
+            recurringDate.setMonth(recurringDate.getMonth() + 1);
+          } else {
+            break;
+          }
+        }
+      }
+    });
+    return eventsData;
+  };
+
   // Load events from Firestore
   useEffect(() => {
     if (!user) return;
@@ -83,15 +159,7 @@ export default function CalendarApp() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const eventsData = {};
-        snapshot.forEach((doc) => {
-          const event = { id: doc.id, ...doc.data() };
-          const dateKey = event.date;
-          if (!eventsData[dateKey]) {
-            eventsData[dateKey] = [];
-          }
-          eventsData[dateKey].push(event);
-        });
+        const eventsData = expandRecurringEvents(snapshot.docs);
         setEvents(eventsData);
         setLoading(false);
       },
@@ -103,7 +171,7 @@ export default function CalendarApp() {
     );
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, currentDate]); // Added currentDate dependency
 
   const getDaysInMonth = (date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -160,7 +228,9 @@ export default function CalendarApp() {
       await addDoc(collection(db, "events"), {
         title: eventTitle.trim(),
         time: eventTime,
-        date: dateKey,
+        notes: eventNotes,
+        date: dateKey, // This should now correctly use the selected date
+        recurrence: recurrence,
         createdAt: new Date(),
         userId: user.uid,
         completed: false,
@@ -168,6 +238,8 @@ export default function CalendarApp() {
 
       setEventTitle("");
       setEventTime("");
+      setEventNotes("");
+      setRecurrence("none");
       setShowEventModal(false);
     } catch (error) {
       console.error("Error adding event:", error);
@@ -319,6 +391,48 @@ export default function CalendarApp() {
     return days;
   };
 
+  const renderSearchResults = () => {
+    const allEvents = Object.values(events).flat();
+    const filteredEvents = allEvents.filter(
+      (event) =>
+        event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (event.notes &&
+          event.notes.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+
+    return (
+      <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-6">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">
+          Search Results
+        </h2>
+        <div className="space-y-3">
+          {filteredEvents.length > 0 ? (
+            filteredEvents.map((event) => (
+              <div
+                key={event.id}
+                className="flex items-start justify-between p-4 rounded-2xl bg-gray-50"
+              >
+                <div>
+                  <div className="font-bold text-lg text-gray-800">
+                    {event.title}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {new Date(event.date).toLocaleDateString()}
+                  </div>
+                  {event.notes && (
+                    <p className="text-sm text-gray-500 mt-1">{event.notes}</p>
+                  )}
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-gray-500">No events found.</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   if (authLoading || loading || !user) {
     return (
       <div className="min-h-screen bg-green-800 flex items-center justify-center">
@@ -368,7 +482,7 @@ export default function CalendarApp() {
         )}
 
         {/* Header */}
-        <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 mb-8 p-8 relative overflow-hidden">
+        <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 mb-8 p-6 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-green-800/5 to-green-800/5"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-6">
@@ -390,36 +504,24 @@ export default function CalendarApp() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => navigateMonth(-1)}
-                  className="p-3 hover:bg-green-100 rounded-2xl transition-all duration-200 transform hover:scale-110 hover:shadow-md group"
-                >
-                  <ChevronLeft
-                    size={24}
-                    className="text-green-800 group-hover:text-green-700"
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                    size={20}
                   />
-                </button>
-
-                <div className="bg-gradient-to-r from-green-800 to-green-700 text-white px-6 py-3 rounded-2xl shadow-lg">
-                  <h2 className="text-xl font-bold text-center min-w-[220px]">
-                    {months[currentDate.getMonth()]} {currentDate.getFullYear()}
-                  </h2>
+                  <input
+                    type="text"
+                    placeholder="Search events..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 pr-4 py-2 w-64 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-700 focus:border-green-700 transition-all duration-200 text-gray-800 placeholder-gray-400"
+                  />
                 </div>
 
                 <button
-                  onClick={() => navigateMonth(1)}
-                  className="p-3 hover:bg-green-100 rounded-2xl transition-all duration-200 transform hover:scale-110 hover:shadow-md group"
-                >
-                  <ChevronRight
-                    size={24}
-                    className="text-green-800 group-hover:text-green-700"
-                  />
-                </button>
-
-                <button
                   onClick={signOut}
-                  className="p-3 hover:bg-red-100 rounded-2xl transition-all duration-200 transform hover:scale-110 hover:shadow-md group ml-4"
+                  className="p-3 hover:bg-red-100 rounded-2xl transition-all duration-200 transform hover:scale-110 hover:shadow-md group"
                 >
                   <LogOut
                     size={24}
@@ -429,8 +531,37 @@ export default function CalendarApp() {
               </div>
             </div>
 
+            {/* Calendar Navigation */}
+            <div className="flex items-center justify-center gap-3 mb-6">
+              <button
+                onClick={() => navigateMonth(-1)}
+                className="p-3 hover:bg-green-100 rounded-2xl transition-all duration-200 transform hover:scale-110 hover:shadow-md group"
+              >
+                <ChevronLeft
+                  size={24}
+                  className="text-green-800 group-hover:text-green-700"
+                />
+              </button>
+
+              <div className="bg-gradient-to-r from-green-800 to-green-700 text-white px-8 py-3 rounded-2xl shadow-lg">
+                <h2 className="text-xl font-bold text-center min-w-[220px]">
+                  {months[currentDate.getMonth()]} {currentDate.getFullYear()}
+                </h2>
+              </div>
+
+              <button
+                onClick={() => navigateMonth(1)}
+                className="p-3 hover:bg-green-100 rounded-2xl transition-all duration-200 transform hover:scale-110 hover:shadow-md group"
+              >
+                <ChevronRight
+                  size={24}
+                  className="text-green-800 group-hover:text-green-700"
+                />
+              </button>
+            </div>
+
             {/* Days of week header */}
-            <div className="grid grid-cols-7 gap-2 mb-6">
+            <div className="grid grid-cols-7 gap-2">
               {daysOfWeek.map((day, index) => {
                 const isSelectedDay =
                   selectedDate &&
@@ -442,7 +573,7 @@ export default function CalendarApp() {
                 return (
                   <div
                     key={day}
-                    className={`p-4 text-center font-bold rounded-xl border transition-all duration-300 ${
+                    className={`p-3 text-center font-bold rounded-xl border transition-all duration-300 ${
                       isSelectedDay
                         ? "bg-green-800 text-white shadow-lg"
                         : "text-gray-700 bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200"
@@ -456,135 +587,150 @@ export default function CalendarApp() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-          {/* Calendar Grid */}
-          <div className="xl:col-span-3">
-            <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 overflow-hidden">
-              <div className="grid grid-cols-7 gap-2 p-6">
-                {renderCalendarDays()}
-              </div>
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Leaderboard */}
-            <div className="transform hover:scale-105 transition-all duration-300">
-              <Leaderboard />
-            </div>
-
-            {/* Add Event Button */}
-            <button
-              onClick={() => setShowEventModal(true)}
-              disabled={!selectedDate}
-              className={`w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-bold text-lg transition-all duration-300 transform hover:scale-105 ${
-                selectedDate
-                  ? "bg-gradient-to-r from-green-800 to-green-700 text-white hover:from-green-700 hover:to-green-600 shadow-lg hover:shadow-xl"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
-              }`}
-            >
-              <Plus size={24} />
-              Add Event
-              {selectedDate && <Sparkles size={20} className="animate-pulse" />}
-            </button>
-
-            {/* Selected Date Events */}
-            {selectedDate && (
-              <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-6 transform hover:scale-105 transition-all duration-300">
-                <h3 className="font-bold text-xl text-gray-800 mb-4 flex items-center gap-2">
-                  <Star className="text-green-600" size={20} />
-                  {months[selectedDate.month]} {selectedDate.day},{" "}
-                  {selectedDate.year}
-                </h3>
-                <div className="space-y-3">
-                  {events[selectedDate.dateKey]?.length > 0 ? (
-                    events[selectedDate.dateKey].map((event) => (
-                      <div
-                        key={event.id}
-                        className={`flex items-start justify-between p-4 rounded-2xl transition-all duration-200 hover:shadow-md ${
-                          event.completed
-                            ? "bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200"
-                            : "bg-gradient-to-r from-green-50 to-green-100 border-2 border-green-200"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={event.completed || false}
-                            onChange={() => {
-                              if (!event.completed) {
-                                setEventToComplete(event);
-                                setShowCompleteModal(true);
-                              }
-                            }}
-                            className="h-6 w-6 rounded-lg text-green-800 focus:ring-green-700 border-2 border-gray-300 transition-all duration-200"
-                            disabled={event.completed}
-                          />
-                          <div>
-                            <div
-                              className={`font-bold text-lg ${
-                                event.completed
-                                  ? "text-green-700 line-through"
-                                  : "text-gray-800"
-                              }`}
-                            >
-                              {event.title}
-                            </div>
-                            {event.time && (
-                              <div className="text-sm text-gray-600 flex items-center gap-2 mt-1">
-                                <Clock size={16} />
-                                {event.time}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleDeleteEvent(event.id)}
-                          className="text-red-500 hover:text-red-700 p-2 hover:bg-red-100 rounded-xl transition-all duration-200"
-                        >
-                          <X size={20} />
-                        </button>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <Calendar
-                        className="mx-auto mb-3 text-gray-300"
-                        size={48}
-                      />
-                      <p className="text-gray-500 font-medium">
-                        No events for this date
-                      </p>
-                      <p className="text-sm text-gray-400">
-                        Click "Add Event" to get started!
-                      </p>
-                    </div>
-                  )}
+        {searchQuery ? (
+          <div>{renderSearchResults()}</div>
+        ) : (
+          <div className="grid grid-cols-12 gap-6">
+            {/* Calendar Grid - Now takes up more space */}
+            <div className="col-span-12 lg:col-span-8">
+              <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 overflow-hidden">
+                <div className="grid grid-cols-7 gap-2 p-6">
+                  {renderCalendarDays()}
                 </div>
               </div>
-            )}
+            </div>
 
-            {!selectedDate && (
-              <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-6 text-center">
-                <Calendar className="mx-auto mb-4 text-gray-300" size={48} />
-                <p className="text-gray-500 font-medium text-lg">
-                  Select a date
-                </p>
-                <p className="text-sm text-gray-400 mt-1">
-                  Choose any day to view or add events
-                </p>
+            {/* Sidebar - Now more compact */}
+            <div className="col-span-12 lg:col-span-4 space-y-6">
+              {/* Add Event Button */}
+              <button
+                onClick={() => setShowEventModal(true)}
+                disabled={!selectedDate}
+                className={`w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-bold text-lg transition-all duration-300 transform hover:scale-105 ${
+                  selectedDate
+                    ? "bg-gradient-to-r from-green-800 to-green-700 text-white hover:from-green-700 hover:to-green-600 shadow-lg hover:shadow-xl"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                }`}
+              >
+                <Plus size={24} />
+                Add Event
+                {selectedDate && (
+                  <Sparkles size={20} className="animate-pulse" />
+                )}
+              </button>
+
+              {/* Selected Date Events */}
+              {selectedDate ? (
+                <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-6 transform hover:scale-105 transition-all duration-300">
+                  <h3 className="font-bold text-xl text-gray-800 mb-4 flex items-center gap-2">
+                    <Star className="text-green-600" size={20} />
+                    {months[selectedDate.month]} {selectedDate.day},{" "}
+                    {selectedDate.year}
+                  </h3>
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {events[selectedDate.dateKey]?.length > 0 ? (
+                      events[selectedDate.dateKey].map((event) => (
+                        <div
+                          key={event.id}
+                          className={`flex items-start justify-between p-4 rounded-2xl transition-all duration-200 hover:shadow-md ${
+                            event.completed
+                              ? "bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200"
+                              : "bg-gradient-to-r from-green-50 to-green-100 border-2 border-green-200"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={event.completed || false}
+                              onChange={() => {
+                                if (!event.completed) {
+                                  setEventToComplete(event);
+                                  setShowCompleteModal(true);
+                                }
+                              }}
+                              className="h-5 w-5 rounded text-green-800 focus:ring-green-700 border-2 border-gray-300 transition-all duration-200"
+                              disabled={event.completed}
+                            />
+                            <div>
+                              <div
+                                className={`font-bold ${
+                                  event.completed
+                                    ? "text-green-700 line-through"
+                                    : "text-gray-800"
+                                }`}
+                              >
+                                {event.title}
+                              </div>
+                              {event.time && (
+                                <div className="text-sm text-gray-600 flex items-center gap-1 mt-1">
+                                  <Clock size={14} />
+                                  {event.time}
+                                </div>
+                              )}
+                              {event.notes && (
+                                <p className="text-sm text-gray-500 mt-1">
+                                  {event.notes}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteEvent(event.id)}
+                            className="text-red-500 hover:text-red-700 p-2 hover:bg-red-100 rounded-xl transition-all duration-200"
+                          >
+                            <X size={18} />
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <Calendar
+                          className="mx-auto mb-3 text-gray-300"
+                          size={48}
+                        />
+                        <p className="text-gray-500 font-medium">
+                          No events for this date
+                        </p>
+                        <p className="text-sm text-gray-400">
+                          Click "Add Event" to get started!
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-xl border border-white/20 p-6 text-center">
+                  <Calendar className="mx-auto mb-4 text-gray-300" size={48} />
+                  <p className="text-gray-500 font-medium text-lg">
+                    Select a date
+                  </p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Choose any day to view or add events
+                  </p>
+                </div>
+              )}
+
+              {/* Achievements - Made more compact */}
+              <div className="transform hover:scale-105 transition-all duration-300">
+                <Achievements profile={profile} />
               </div>
-            )}
+
+              {/* Leaderboard - Made more compact */}
+              <div className="transform hover:scale-105 transition-all duration-300">
+                <Leaderboard />
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Event Modal */}
-        {showEventModal && (
+        {showEventModal && selectedDate && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 transform scale-100 transition-all duration-300">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-2xl font-bold bg-gradient-to-r from-green-800 to-green-700 bg-clip-text text-transparent">
-                  ✨ Add New Event
+                  ✨ Add Event for {months[selectedDate.month]}{" "}
+                  {selectedDate.day}
                 </h3>
                 <button
                   onClick={() => setShowEventModal(false)}
@@ -619,6 +765,35 @@ export default function CalendarApp() {
                     onChange={(e) => setEventTime(e.target.value)}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-700 focus:border-green-700 transition-all duration-200 text-gray-800"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-3">
+                    Notes (optional)
+                  </label>
+                  <textarea
+                    value={eventNotes}
+                    onChange={(e) => setEventNotes(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-700 focus:border-green-700 transition-all duration-200 text-gray-800"
+                    placeholder="Add some details..."
+                    rows="3"
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-3">
+                    Repeat
+                  </label>
+                  <select
+                    value={recurrence}
+                    onChange={(e) => setRecurrence(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-700 focus:border-green-700 transition-all duration-200 text-gray-800"
+                  >
+                    <option value="none">Never</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
                 </div>
               </div>
 

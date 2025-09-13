@@ -17,10 +17,11 @@ export default function Leaderboard() {
   const [profiles, setProfiles] = useState(sampleData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [filter, setFilter] = useState("score");
 
   useEffect(() => {
     const profilesRef = collection(db, "profiles");
-    const q = query(profilesRef, orderBy("score", "desc"));
+    const q = query(profilesRef, orderBy(filter, "desc"));
 
     const unsubscribe = onSnapshot(
       q,
@@ -46,7 +47,7 @@ export default function Leaderboard() {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [filter]);
 
   const getRankIcon = (rank) => {
     switch (rank) {
@@ -91,7 +92,7 @@ export default function Leaderboard() {
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Trophy className="text-purple-600" size={20} />
+            <Trophy className="text-green-800" size={20} />
             <h2 className="text-lg font-bold text-gray-900">Leaderboard</h2>
           </div>
           <div className="flex items-center text-sm text-gray-500">
@@ -102,6 +103,12 @@ export default function Leaderboard() {
         {error && (
           <div className="text-xs text-blue-600 mt-1">{error}</div>
         )}
+        <div className="flex items-center gap-2 mt-2">
+          <button onClick={() => setFilter("score")} className={`px-2 py-1 text-xs rounded-md ${filter === 'score' ? 'bg-green-800 text-white' : 'bg-gray-200 text-gray-700'}`}>Overall</button>
+          <button onClick={() => setFilter("punctual")} className={`px-2 py-1 text-xs rounded-md ${filter === 'punctual' ? 'bg-green-800 text-white' : 'bg-gray-200 text-gray-700'}`}>Punctual</button>
+          <button onClick={() => setFilter("academicWarrior")} className={`px-2 py-1 text-xs rounded-md ${filter === 'academicWarrior' ? 'bg-green-800 text-white' : 'bg-gray-200 text-gray-700'}`}>Academic</button>
+          <button onClick={() => setFilter("athleticFreak")} className={`px-2 py-1 text-xs rounded-md ${filter === 'athleticFreak' ? 'bg-green-800 text-white' : 'bg-gray-200 text-gray-700'}`}>Athletic</button>
+        </div>
       </div>
 
       {/* Leaderboard List */}
@@ -131,7 +138,7 @@ export default function Leaderboard() {
 
               <div className="text-right">
                 <div className="font-bold text-gray-800 text-md">
-                  {player.score?.toLocaleString() || 0}
+                  {player[filter]?.toLocaleString() || 0}
                 </div>
               </div>
             </div>
