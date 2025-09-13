@@ -431,14 +431,27 @@ export default function CalendarApp() {
 
             {/* Days of week header */}
             <div className="grid grid-cols-7 gap-2 mb-6">
-              {daysOfWeek.map((day) => (
-                <div
-                  key={day}
-                  className="p-4 text-center font-bold text-gray-700 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200"
-                >
-                  {day}
-                </div>
-              ))}
+              {daysOfWeek.map((day, index) => {
+                const isSelectedDay =
+                  selectedDate &&
+                  new Date(
+                    selectedDate.year,
+                    selectedDate.month,
+                    selectedDate.day
+                  ).getDay() === index;
+                return (
+                  <div
+                    key={day}
+                    className={`p-4 text-center font-bold rounded-xl border transition-all duration-300 ${
+                      isSelectedDay
+                        ? "bg-green-800 text-white shadow-lg"
+                        : "text-gray-700 bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200"
+                    }`}
+                  >
+                    {day}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
